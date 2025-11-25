@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const connectDB = require('./config/database');
 //////////////
-// const mongoSanitize = require('express-mongo-sanitize');
+const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const helmet = require('helmet');
 
@@ -27,7 +27,7 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions));
 
-// app.use(mongoSanitize());
+app.use(mongoSanitize());
 app.use(hpp());
 app.use(express.json());
 
