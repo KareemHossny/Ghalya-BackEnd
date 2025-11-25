@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const xss = require('xss-clean');
@@ -23,19 +22,6 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions));
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  validate: { 
-    trustProxy: false, // تعطيل التحقق من proxy
-    xForwardedForHeader: false // تعطيل تحقق X-Forwarded-For
-  },
-  keyGenerator: (req) => {
-    return req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
-  }
-});
-
-app.use(limiter);
 app.use(express.json());
 app.use(mongoSanitize());
 app.use(xss());
