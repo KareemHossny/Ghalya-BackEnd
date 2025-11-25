@@ -3,13 +3,13 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
-const helmet = require('helmet');
+// const helmet = require('helmet');
 const connectDB = require('./config/database');
 require('dotenv').config();
 
 const app = express();
 
-app.use(helmet());
+// app.use(helmet());
 
 // إعدادات CORS المحدثة
 const corsOptions = {
