@@ -26,19 +26,16 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions));
 
-// 🔥 تحديث rate limit مع keyGenerator مخصص لـ Vercel
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 دقيقة
-  max: 100, // حد 100 طلب لكل IP
-  message: {
-    error: 'لقد تجاوزت الحد المسموح به من الطلبات، يرجى المحاولة لاحقاً'
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  validate: { 
+    trustProxy: false, // تعطيل التحقق من proxy
+    xForwardedForHeader: false // تعطيل تحقق X-Forwarded-For
   },
   keyGenerator: (req) => {
-    // استخدام X-Forwarded-For header في Vercel
-    return req.headers['x-forwarded-for'] || req.ip;
-  },
-  standardHeaders: true, // إرجاع معلومات rate limit في headers
-  legacyHeaders: false, // تعطيل headers القديمة
+    return req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+  }
 });
 
 app.use(limiter);
