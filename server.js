@@ -1,17 +1,11 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const mongoSanitize = require('express-mongo-sanitize');
-const hpp = require('hpp');
-// const helmet = require('helmet');
 const connectDB = require('./config/database');
 require('dotenv').config();
 
 const app = express();
 
-// app.use(helmet());
-
-// إعدادات CORS المحدثة
 const corsOptions = {
   origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
   credentials: true,
@@ -22,8 +16,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.use(express.json());
-app.use(mongoSanitize());
-app.use(hpp());
+
 
 // Routes
 app.use('/api/products', require('./routes/products'));
