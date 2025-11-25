@@ -7,7 +7,12 @@ require('dotenv').config();
 const app = express();
 
 const corsOptions = {
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+  origin: [
+    'http://localhost:3000', 
+    'http://localhost:3001', 
+    'http://localhost:3002',
+    'https://your-app-name.vercel.app'
+  ],
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -17,6 +22,9 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.json({ message: 'API Ghalya is working!' });
+});
 
 // Routes
 app.use('/api/products', require('./routes/products'));
@@ -106,6 +114,11 @@ app.get('/api/shipping/shipping-cost/:governorateId', (req, res) => {
 connectDB();
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
