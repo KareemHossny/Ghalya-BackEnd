@@ -4,7 +4,7 @@ const cors = require('cors');
 const connectDB = require('./config/database');
 //////////////
 // const mongoSanitize = require('express-mongo-sanitize');
-// const hpp = require('hpp');
+const hpp = require('hpp');
 const helmet = require('helmet');
 
 require('dotenv').config();
@@ -28,7 +28,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // app.use(mongoSanitize());
-// app.use(hpp());
+app.use(hpp());
 app.use(express.json());
 
 app.get('/', (req, res) => {
