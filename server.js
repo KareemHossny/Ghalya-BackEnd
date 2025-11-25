@@ -1,10 +1,16 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const hpp = require('hpp');
+const xss = require('xss-clean');
+const helmet = require('helmet');
 const connectDB = require('./config/database');
 require('dotenv').config();
 
 const app = express();
+app.use(helmet());
 
 // إعدادات CORS المحدثة
 const corsOptions = {
@@ -15,7 +21,14 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+}));
 app.use(express.json());
+app.use(mongoSanitize());
+app.use(xss());
+app.use(hpp());
 
 // Routes
 app.use('/api/products', require('./routes/products'));

@@ -27,9 +27,7 @@ const verifyToken = (req, res, next) => {
 router.post('/', async (req, res) => {
     try {
       const { name, email, subject, message } = req.body;
-      
-      console.log('🔵 Received message data:', req.body);
-      
+            
       // تحقق إضافي من البيانات
       if (!name || !email || !subject || !message) {
         console.log('🔴 Missing fields:', { name, email, subject, message });
@@ -69,7 +67,6 @@ router.post('/', async (req, res) => {
       
       await newMessage.save();
       
-      console.log('🟢 Message saved successfully:', newMessage._id);
       
       res.status(201).json({ 
         success: true, 
@@ -99,9 +96,7 @@ router.post('/', async (req, res) => {
 router.get('/', verifyToken, async (req, res) => {
     try {
       const { page = 1, limit = 10, status } = req.query;
-      
-      console.log('طلب رسائل:', { page, limit, status });
-      
+            
       const query = {};
       if (status && status !== 'all') {
         query.status = status;
@@ -114,7 +109,6 @@ router.get('/', verifyToken, async (req, res) => {
       
       const total = await Message.countDocuments(query);
       
-      console.log(`تم جلب ${messages.length} رسالة من إجمالي ${total}`);
       
       res.json({
         success: true,
