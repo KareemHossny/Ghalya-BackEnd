@@ -10,6 +10,10 @@ const connectDB = require('./config/database');
 require('dotenv').config();
 
 const app = express();
+
+// 🔥 الحل: إضافة trust proxy لـ Vercel
+app.set('trust proxy', 1);
+
 app.use(helmet());
 
 // إعدادات CORS المحدثة
@@ -21,10 +25,23 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-}));
+
+// 🔥 تحديث rate limit مع keyGenerator مخصص لـ Vercel
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 دقيقة
+  max: 100, // حد 100 طلب لكل IP
+  message: {
+    error: 'لقد تجاوزت الحد المسموح به من الطلبات، يرجى المحاولة لاحقاً'
+  },
+  keyGenerator: (req) => {
+    // استخدام X-Forwarded-For header في Vercel
+    return req.headers['x-forwarded-for'] || req.ip;
+  },
+  standardHeaders: true, // إرجاع معلومات rate limit في headers
+  legacyHeaders: false, // تعطيل headers القديمة
+});
+
+app.use(limiter);
 app.use(express.json());
 app.use(mongoSanitize());
 app.use(xss());
