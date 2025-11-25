@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
-const xss = require('xss-clean');
 const helmet = require('helmet');
 const connectDB = require('./config/database');
 require('dotenv').config();
@@ -24,7 +23,6 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(mongoSanitize());
-app.use(xss());
 app.use(hpp());
 
 // Routes
