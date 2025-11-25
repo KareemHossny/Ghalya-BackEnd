@@ -2,9 +2,15 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const connectDB = require('./config/database');
+//////////////
+// const mongoSanitize = require('express-mongo-sanitize');
+// const hpp = require('hpp');
+const helmet = require('helmet');
+
 require('dotenv').config();
 
 const app = express();
+app.use(helmet());
 
 const corsOptions = {
   origin: [
@@ -17,9 +23,12 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+
 // Middleware
 app.use(cors(corsOptions));
 
+// app.use(mongoSanitize());
+// app.use(hpp());
 app.use(express.json());
 
 app.get('/', (req, res) => {
