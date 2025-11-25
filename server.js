@@ -11,9 +11,6 @@ require('dotenv').config();
 
 const app = express();
 
-// 🔥 الحل: إضافة trust proxy لـ Vercel
-app.set('trust proxy', 1);
-
 app.use(helmet());
 
 // إعدادات CORS المحدثة
