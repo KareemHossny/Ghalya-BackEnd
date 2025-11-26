@@ -4,9 +4,6 @@ const router = express.Router();
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const Message = require('../models/message');
-const upload = require('../config/upload');
-const path = require('path');
-const fs = require('fs');
 
 // Middleware للتحقق من التوكن
 const verifyToken = (req, res, next) => {
@@ -74,27 +71,29 @@ router.get('/products', verifyToken, async (req, res) => {
   }
 });
 
-// إضافة منتج جديد مع رفع صورة
-router.post('/products', verifyToken, upload.single('image'), async (req, res) => {
+// إضافة منتج جديد مع صورة Base64
+router.post('/products', verifyToken, async (req, res) => {
   try {
     console.log('📦 طلب إضافة منتج جديد');
-    console.log('📁 الملف:', req.file);
     console.log('📋 البيانات:', req.body);
 
-    // التحقق من وجود صورة
-    if (!req.file) {
-      return res.status(400).json({ message: 'الصورة مطلوبة' });
+    const { name, description, price, stock, bestseller, imageBase64 } = req.body;
+    
+    // التحقق من البيانات المطلوبة
+    if (!name || !price || !stock) {
+      return res.status(400).json({ message: 'جميع الحقول المطلوبة يجب ملؤها' });
     }
 
-    // التحقق من البيانات المطلوبة
-    const { name, description, price, stock, bestseller } = req.body;
-    
-    if (!name || !price || !stock) {
-      // حذف الصورة المرفوعة إذا كانت البيانات ناقصة
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
-      return res.status(400).json({ message: 'جميع الحقول المطلوبة يجب ملؤها' });
+    // إذا كانت هناك صورة Base64، قم بتحويلها
+    let imageUrl = '';
+    if (imageBase64 && imageBase64.startsWith('data:image/')) {
+      // في Vercel، يمكننا استخدام خدمة خارجية أو تخزين Base64 مباشرة
+      // هنا سنستخدم Base64 مباشرة كـ Data URL
+      imageUrl = imageBase64;
+    } else if (imageBase64) {
+      return res.status(400).json({ message: 'صيغة الصورة غير صالحة' });
+    } else {
+      return res.status(400).json({ message: 'الصورة مطلوبة' });
     }
 
     const productData = {
@@ -103,7 +102,7 @@ router.post('/products', verifyToken, upload.single('image'), async (req, res) =
       price: parseFloat(price),
       stock: parseInt(stock),
       bestseller: bestseller === 'true' || bestseller === true,
-      image: `/uploads/products/${req.file.filename}` // حفظ مسار الصورة
+      image: imageUrl
     };
 
     const product = new Product(productData);
@@ -112,20 +111,15 @@ router.post('/products', verifyToken, upload.single('image'), async (req, res) =
     console.log('✅ تم إضافة المنتج بنجاح:', savedProduct._id);
     res.status(201).json(savedProduct);
   } catch (error) {
-    // حذف الصورة المرفوعة إذا حدث خطأ
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
     console.error('❌ خطأ في إضافة المنتج:', error);
     res.status(400).json({ message: error.message });
   }
 });
 
 // تحديث منتج مع إمكانية تحديث الصورة
-router.put('/products/:id', verifyToken, upload.single('image'), async (req, res) => {
+router.put('/products/:id', verifyToken, async (req, res) => {
   try {
     console.log('📦 طلب تحديث منتج:', req.params.id);
-    console.log('📁 الملف:', req.file);
     console.log('📋 البيانات:', req.body);
 
     const product = await Product.findById(req.params.id);
@@ -133,25 +127,19 @@ router.put('/products/:id', verifyToken, upload.single('image'), async (req, res
       return res.status(404).json({ message: 'المنتج غير موجود' });
     }
 
-    let updateData = { ...req.body };
-    
-    // إذا تم رفع صورة جديدة، تحديث المسار وحذف الصورة القديمة
-    if (req.file) {
-      // حذف الصورة القديمة إذا كانت موجودة
-      if (product.image && product.image.startsWith('/uploads/products/')) {
-        const oldImagePath = path.join(__dirname, '..', product.image);
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
-        }
-      }
-      updateData.image = `/uploads/products/${req.file.filename}`;
-    }
+    const { name, description, price, stock, bestseller, imageBase64 } = req.body;
 
-    // تحويل أنواع البيانات
-    if (updateData.price) updateData.price = parseFloat(updateData.price);
-    if (updateData.stock) updateData.stock = parseInt(updateData.stock);
-    if (updateData.bestseller) {
-      updateData.bestseller = updateData.bestseller === 'true' || updateData.bestseller === true;
+    let updateData = {
+      name,
+      description: description || '',
+      price: parseFloat(price),
+      stock: parseInt(stock),
+      bestseller: bestseller === 'true' || bestseller === true
+    };
+
+    // إذا كانت هناك صورة جديدة Base64، قم بتحديثها
+    if (imageBase64 && imageBase64.startsWith('data:image/')) {
+      updateData.image = imageBase64;
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -163,10 +151,6 @@ router.put('/products/:id', verifyToken, upload.single('image'), async (req, res
     console.log('✅ تم تحديث المنتج بنجاح');
     res.json(updatedProduct);
   } catch (error) {
-    // حذف الصورة المرفوعة إذا حدث خطأ
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
     console.error('❌ خطأ في تحديث المنتج:', error);
     res.status(400).json({ message: error.message });
   }
@@ -175,21 +159,11 @@ router.put('/products/:id', verifyToken, upload.single('image'), async (req, res
 // حذف منتج
 router.delete('/products/:id', verifyToken, async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findByIdAndDelete(req.params.id);
     
     if (!product) {
       return res.status(404).json({ message: 'المنتج غير موجود' });
     }
-
-    // حذف الصورة المرتبطة بالمنتج
-    if (product.image && product.image.startsWith('/uploads/products/')) {
-      const imagePath = path.join(__dirname, '..', product.image);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
-
-    await Product.findByIdAndDelete(req.params.id);
     
     res.json({ message: 'تم حذف المنتج بنجاح' });
   } catch (error) {
