@@ -4,6 +4,7 @@ const router = express.Router();
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const Message = require('../models/message');
+const cloudinary = require('../config/cloudinary');
 
 // Middleware للتحقق من التوكن
 const verifyToken = (req, res, next) => {
@@ -26,6 +27,30 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+// دالة لرفع الصور إلى Cloudinary
+const uploadToCloudinary = async (imageBase64) => {
+  try {
+    // إذا كانت الصورة صغيرة جداً أو ليست Base64، ارجعها كما هي
+    if (!imageBase64.startsWith('data:image/')) {
+      return imageBase64;
+    }
+
+    const result = await cloudinary.uploader.upload(imageBase64, {
+      folder: 'ghalya/products',
+      quality: 'auto',
+      fetch_format: 'auto',
+      width: 800,
+      height: 800,
+      crop: 'limit'
+    });
+
+    return result.secure_url;
+  } catch (error) {
+    console.error('❌ خطأ في رفع الصورة لـ Cloudinary:', error);
+    throw new Error('فشل في رفع الصورة');
+  }
+};
+
 // تسجيل الدخول وإنشاء التوكن
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
@@ -34,14 +59,13 @@ router.post('/login', (req, res) => {
   const adminPassword = process.env.ADMIN_PASSWORD;
 
   if (username === adminUsername && password === adminPassword) {
-    // إنشاء JWT token
     const token = jwt.sign(
       { 
         username: username, 
         role: 'admin' 
       },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' } // صلاحية التوكن 24 ساعة
+      { expiresIn: '24h' }
     );
 
     res.json({ 
@@ -71,7 +95,7 @@ router.get('/products', verifyToken, async (req, res) => {
   }
 });
 
-// إضافة منتج جديد مع صورة Base64
+// إضافة منتج جديد مع Cloudinary
 router.post('/products', verifyToken, async (req, res) => {
   try {
     console.log('📦 طلب إضافة منتج جديد');
@@ -88,22 +112,13 @@ router.post('/products', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'الصورة مطلوبة' });
     }
 
-    // التحقق من صيغة Base64
-    if (!imageBase64.startsWith('data:image/')) {
-      return res.status(400).json({ message: 'صيغة الصورة غير صالحة' });
-    }
+    let imageUrl = imageBase64;
 
-    // زيادة الحد المسموح للهواتف (5MB بدلاً من 3MB)
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    const fileSizeInMB = buffer.length / (1024 * 1024);
-    
-    console.log(`📊 حجم الصورة المستلمة: ${fileSizeInMB.toFixed(2)}MB`);
-    
-    if (fileSizeInMB > 5) {
-      return res.status(400).json({ 
-        message: `حجم الصورة كبير جداً (${fileSizeInMB.toFixed(2)}MB). يجب أن يكون أقل من 5MB` 
-      });
+    // إذا كانت صورة Base64 جديدة، ارفعها لـ Cloudinary
+    if (imageBase64.startsWith('data:image/')) {
+      console.log('☁️ جاري رفع الصورة لـ Cloudinary...');
+      imageUrl = await uploadToCloudinary(imageBase64);
+      console.log('✅ تم رفع الصورة بنجاح:', imageUrl);
     }
 
     const productData = {
@@ -112,7 +127,7 @@ router.post('/products', verifyToken, async (req, res) => {
       price: parseFloat(price),
       stock: parseInt(stock),
       bestseller: bestseller === 'true' || bestseller === true,
-      image: imageBase64
+      image: imageUrl // الآن تخزن رابط Cloudinary بدلاً من Base64
     };
 
     const product = new Product(productData);
@@ -123,21 +138,16 @@ router.post('/products', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('❌ خطأ في إضافة المنتج:', error);
     
-    // رسالة خطأ أكثر وضوحاً
     let errorMessage = error.message;
-    if (error.name === 'PayloadTooLargeError') {
-      errorMessage = 'حجم البيانات كبير جداً. يرجى اختيار صورة أصغر';
-    } else if (error.code === 'BSONError') {
-      errorMessage = 'حجم الصورة كبير جداً. يرجى اختيار صورة أصغر';
-    } else if (error.message.includes('buffering timed out')) {
-      errorMessage = 'انتهت مهلة تحميل الصورة. يرجى اختيار صورة أصغر';
+    if (error.message.includes('Cloudinary')) {
+      errorMessage = 'فشل في رفع الصورة. يرجى المحاولة مرة أخرى';
     }
     
     res.status(400).json({ message: errorMessage });
   }
 });
 
-// تحديث منتج مع إمكانية تحديث الصورة
+// تحديث منتج مع Cloudinary
 router.put('/products/:id', verifyToken, async (req, res) => {
   try {
     console.log('📦 طلب تحديث منتج:', req.params.id);
@@ -157,18 +167,12 @@ router.put('/products/:id', verifyToken, async (req, res) => {
       bestseller: bestseller === 'true' || bestseller === true
     };
 
-    // إذا كانت هناك صورة جديدة Base64، قم بتحديثها
+    // إذا كانت هناك صورة جديدة Base64، ارفعها لـ Cloudinary
     if (imageBase64 && imageBase64.startsWith('data:image/')) {
-      // التحقق من حجم الصورة الجديدة
-      const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
-      const fileSizeInMB = buffer.length / (1024 * 1024);
-      
-      if (fileSizeInMB > 5) {
-        return res.status(400).json({ message: 'حجم الصورة يجب أن يكون أقل من 5MB' });
-      }
-
-      updateData.image = imageBase64;
+      console.log('☁️ جاري تحديث الصورة في Cloudinary...');
+      const imageUrl = await uploadToCloudinary(imageBase64);
+      updateData.image = imageUrl;
+      console.log('✅ تم تحديث الصورة بنجاح');
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -185,22 +189,41 @@ router.put('/products/:id', verifyToken, async (req, res) => {
   }
 });
 
-// حذف منتج
+// حذف منتج مع حذف الصورة من Cloudinary
 router.delete('/products/:id', verifyToken, async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findById(req.params.id);
     
     if (!product) {
       return res.status(404).json({ message: 'المنتج غير موجود' });
     }
+
+    // إذا كانت الصورة مخزنة في Cloudinary، احذفها
+    if (product.image && product.image.includes('cloudinary.com')) {
+      try {
+        // استخراج public_id من الرابط
+        const urlParts = product.image.split('/');
+        const publicId = urlParts[urlParts.length - 1].split('.')[0];
+        const fullPublicId = `ghalya/products/${publicId}`;
+        
+        await cloudinary.uploader.destroy(fullPublicId);
+        console.log('🗑️ تم حذف الصورة من Cloudinary');
+      } catch (cloudinaryError) {
+        console.error('⚠️ خطأ في حذف الصورة من Cloudinary:', cloudinaryError);
+        // استمر في حذف المنتج حتى لو فشل حذف الصورة
+      }
+    }
+
+    await Product.findByIdAndDelete(req.params.id);
     
     res.json({ message: 'تم حذف المنتج بنجاح' });
   } catch (error) {
+    console.error('❌ خطأ في حذف المنتج:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// الحصول على جميع الطلبات
+// الباقي من الكود يبقى كما هو...
 router.get('/orders', verifyToken, async (req, res) => {
   try {
     const orders = await Order.find()
@@ -212,7 +235,6 @@ router.get('/orders', verifyToken, async (req, res) => {
   }
 });
 
-// تحديث حالة الطلب
 router.patch('/orders/:id', verifyToken, async (req, res) => {
   try {
     const { status } = req.body;
@@ -237,7 +259,6 @@ router.patch('/orders/:id', verifyToken, async (req, res) => {
   }
 });
 
-// إحصائيات
 router.get('/stats', verifyToken, async (req, res) => {
   try {
     const totalProducts = await Product.countDocuments();
