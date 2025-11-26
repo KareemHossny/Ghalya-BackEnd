@@ -30,7 +30,6 @@ app.use(cors(corsOptions));
 app.use(mongoSanitize());
 app.use(hpp());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/', (req, res) => {
