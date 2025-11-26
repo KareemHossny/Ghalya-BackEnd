@@ -5,11 +5,13 @@ const connectDB = require('./config/database');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const helmet = require('helmet');
+const path = require('path');
 
 require('dotenv').config();
 
 const app = express();
 app.use(helmet());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const corsOptions = {
   origin: [

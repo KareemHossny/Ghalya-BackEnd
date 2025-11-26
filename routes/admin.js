@@ -4,6 +4,7 @@ const router = express.Router();
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const Message = require('../models/message');
+const upload = require('../config/upload');
 
 // Middleware للتحقق من التوكن
 const verifyToken = (req, res, next) => {
@@ -71,10 +72,20 @@ router.get('/products', verifyToken, async (req, res) => {
   }
 });
 
-// إضافة منتج جديد
-router.post('/products', verifyToken, async (req, res) => {
+// إضافة منتج جديد مع رفع صورة
+router.post('/products', verifyToken, upload.single('image'), async (req, res) => {
   try {
-    const product = new Product(req.body);
+    // التحقق من وجود صورة
+    if (!req.file) {
+      return res.status(400).json({ message: 'الصورة مطلوبة' });
+    }
+
+    const productData = {
+      ...req.body,
+      image: `/uploads/products/${req.file.filename}` // حفظ مسار الصورة
+    };
+
+    const product = new Product(productData);
     const savedProduct = await product.save();
     res.status(201).json(savedProduct);
   } catch (error) {
@@ -82,12 +93,20 @@ router.post('/products', verifyToken, async (req, res) => {
   }
 });
 
-// تحديث منتج
-router.put('/products/:id', verifyToken, async (req, res) => {
+
+// تحديث منتج مع إمكانية تحديث الصورة
+router.put('/products/:id', verifyToken, upload.single('image'), async (req, res) => {
   try {
+    let updateData = { ...req.body };
+    
+    // إذا تم رفع صورة جديدة، تحديث المسار
+    if (req.file) {
+      updateData.image = `/uploads/products/${req.file.filename}`;
+    }
+
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
     
