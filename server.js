@@ -29,7 +29,11 @@ app.use(cors(corsOptions));
 
 app.use(mongoSanitize());
 app.use(hpp());
+// middleware لتحليل JSON و FormData
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// خدمة الملفات الثابتة من مجلد uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/', (req, res) => {
