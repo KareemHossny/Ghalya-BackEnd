@@ -93,13 +93,17 @@ router.post('/products', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'صيغة الصورة غير صالحة' });
     }
 
-    // التحقق من حجم الصورة (3MB كحد أقصى)
+    // زيادة الحد المسموح للهواتف (5MB بدلاً من 3MB)
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
     const fileSizeInMB = buffer.length / (1024 * 1024);
     
-    if (fileSizeInMB > 3) {
-      return res.status(400).json({ message: 'حجم الصورة يجب أن يكون أقل من 3MB' });
+    console.log(`📊 حجم الصورة المستلمة: ${fileSizeInMB.toFixed(2)}MB`);
+    
+    if (fileSizeInMB > 5) {
+      return res.status(400).json({ 
+        message: `حجم الصورة كبير جداً (${fileSizeInMB.toFixed(2)}MB). يجب أن يكون أقل من 5MB` 
+      });
     }
 
     const productData = {
@@ -108,7 +112,7 @@ router.post('/products', verifyToken, async (req, res) => {
       price: parseFloat(price),
       stock: parseInt(stock),
       bestseller: bestseller === 'true' || bestseller === true,
-      image: imageBase64 // تخزين Base64 مباشرة
+      image: imageBase64
     };
 
     const product = new Product(productData);
@@ -118,7 +122,18 @@ router.post('/products', verifyToken, async (req, res) => {
     res.status(201).json(savedProduct);
   } catch (error) {
     console.error('❌ خطأ في إضافة المنتج:', error);
-    res.status(400).json({ message: error.message });
+    
+    // رسالة خطأ أكثر وضوحاً
+    let errorMessage = error.message;
+    if (error.name === 'PayloadTooLargeError') {
+      errorMessage = 'حجم البيانات كبير جداً. يرجى اختيار صورة أصغر';
+    } else if (error.code === 'BSONError') {
+      errorMessage = 'حجم الصورة كبير جداً. يرجى اختيار صورة أصغر';
+    } else if (error.message.includes('buffering timed out')) {
+      errorMessage = 'انتهت مهلة تحميل الصورة. يرجى اختيار صورة أصغر';
+    }
+    
+    res.status(400).json({ message: errorMessage });
   }
 });
 
@@ -149,8 +164,8 @@ router.put('/products/:id', verifyToken, async (req, res) => {
       const buffer = Buffer.from(base64Data, 'base64');
       const fileSizeInMB = buffer.length / (1024 * 1024);
       
-      if (fileSizeInMB > 3) {
-        return res.status(400).json({ message: 'حجم الصورة يجب أن يكون أقل من 3MB' });
+      if (fileSizeInMB > 5) {
+        return res.status(400).json({ message: 'حجم الصورة يجب أن يكون أقل من 5MB' });
       }
 
       updateData.image = imageBase64;
