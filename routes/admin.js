@@ -75,7 +75,6 @@ router.get('/products', verifyToken, async (req, res) => {
 router.post('/products', verifyToken, async (req, res) => {
   try {
     console.log('📦 طلب إضافة منتج جديد');
-    console.log('📋 البيانات:', req.body);
 
     const { name, description, price, stock, bestseller, imageBase64 } = req.body;
     
@@ -84,16 +83,23 @@ router.post('/products', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'جميع الحقول المطلوبة يجب ملؤها' });
     }
 
-    // إذا كانت هناك صورة Base64، قم بتحويلها
-    let imageUrl = '';
-    if (imageBase64 && imageBase64.startsWith('data:image/')) {
-      // في Vercel، يمكننا استخدام خدمة خارجية أو تخزين Base64 مباشرة
-      // هنا سنستخدم Base64 مباشرة كـ Data URL
-      imageUrl = imageBase64;
-    } else if (imageBase64) {
-      return res.status(400).json({ message: 'صيغة الصورة غير صالحة' });
-    } else {
+    // التحقق من وجود صورة
+    if (!imageBase64) {
       return res.status(400).json({ message: 'الصورة مطلوبة' });
+    }
+
+    // التحقق من صيغة Base64
+    if (!imageBase64.startsWith('data:image/')) {
+      return res.status(400).json({ message: 'صيغة الصورة غير صالحة' });
+    }
+
+    // التحقق من حجم الصورة (3MB كحد أقصى)
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fileSizeInMB = buffer.length / (1024 * 1024);
+    
+    if (fileSizeInMB > 3) {
+      return res.status(400).json({ message: 'حجم الصورة يجب أن يكون أقل من 3MB' });
     }
 
     const productData = {
@@ -102,7 +108,7 @@ router.post('/products', verifyToken, async (req, res) => {
       price: parseFloat(price),
       stock: parseInt(stock),
       bestseller: bestseller === 'true' || bestseller === true,
-      image: imageUrl
+      image: imageBase64 // تخزين Base64 مباشرة
     };
 
     const product = new Product(productData);
@@ -120,7 +126,6 @@ router.post('/products', verifyToken, async (req, res) => {
 router.put('/products/:id', verifyToken, async (req, res) => {
   try {
     console.log('📦 طلب تحديث منتج:', req.params.id);
-    console.log('📋 البيانات:', req.body);
 
     const product = await Product.findById(req.params.id);
     if (!product) {
@@ -139,6 +144,15 @@ router.put('/products/:id', verifyToken, async (req, res) => {
 
     // إذا كانت هناك صورة جديدة Base64، قم بتحديثها
     if (imageBase64 && imageBase64.startsWith('data:image/')) {
+      // التحقق من حجم الصورة الجديدة
+      const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const fileSizeInMB = buffer.length / (1024 * 1024);
+      
+      if (fileSizeInMB > 3) {
+        return res.status(400).json({ message: 'حجم الصورة يجب أن يكون أقل من 3MB' });
+      }
+
       updateData.image = imageBase64;
     }
 
