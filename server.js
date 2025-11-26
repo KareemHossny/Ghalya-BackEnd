@@ -23,15 +23,15 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-
 // Middleware
 app.use(cors(corsOptions));
 
+// زيادة حجم الـ payload المسموح به
+app.use(express.json({ limit: '10mb' })); // زيادة من 1MB إلى 10MB
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
 app.use(mongoSanitize());
 app.use(hpp());
-// middleware لتحليل JSON و FormData
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // خدمة الملفات الثابتة من مجلد uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

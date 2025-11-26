@@ -6,6 +6,10 @@ const Order = require('../models/Order');
 const Message = require('../models/message');
 const cloudinary = require('../config/cloudinary');
 
+// زيادة حجم الـ payload لهذا المسار تحديداً
+router.use(express.json({ limit: '10mb' }));
+router.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
 // Middleware للتحقق من التوكن
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -30,24 +34,22 @@ const verifyToken = (req, res, next) => {
 // دالة لرفع الصور إلى Cloudinary
 const uploadToCloudinary = async (imageBase64) => {
   try {
-    // إذا كانت الصورة صغيرة جداً أو ليست Base64، ارجعها كما هي
-    if (!imageBase64.startsWith('data:image/')) {
-      return imageBase64;
-    }
-
+    console.log('☁️ بدء رفع الصورة لـ Cloudinary...');
+    
     const result = await cloudinary.uploader.upload(imageBase64, {
       folder: 'ghalya/products',
-      quality: 'auto',
+      quality: 'auto:good', // جودة متوسطة لتقليل الحجم
       fetch_format: 'auto',
       width: 800,
       height: 800,
       crop: 'limit'
     });
 
+    console.log('✅ تم رفع الصورة بنجاح، الحجم:', result.bytes, 'bytes');
     return result.secure_url;
   } catch (error) {
     console.error('❌ خطأ في رفع الصورة لـ Cloudinary:', error);
-    throw new Error('فشل في رفع الصورة');
+    throw new Error('فشل في رفع الصورة: ' + error.message);
   }
 };
 
@@ -99,6 +101,7 @@ router.get('/products', verifyToken, async (req, res) => {
 router.post('/products', verifyToken, async (req, res) => {
   try {
     console.log('📦 طلب إضافة منتج جديد');
+    console.log('📊 حجم البيانات المستلمة:', JSON.stringify(req.body).length, 'bytes');
 
     const { name, description, price, stock, bestseller, imageBase64 } = req.body;
     
@@ -112,13 +115,20 @@ router.post('/products', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'الصورة مطلوبة' });
     }
 
-    let imageUrl = imageBase64;
+    let imageUrl;
 
     // إذا كانت صورة Base64 جديدة، ارفعها لـ Cloudinary
     if (imageBase64.startsWith('data:image/')) {
-      console.log('☁️ جاري رفع الصورة لـ Cloudinary...');
-      imageUrl = await uploadToCloudinary(imageBase64);
-      console.log('✅ تم رفع الصورة بنجاح:', imageUrl);
+      try {
+        imageUrl = await uploadToCloudinary(imageBase64);
+      } catch (uploadError) {
+        console.error('❌ فشل في رفع الصورة:', uploadError);
+        return res.status(400).json({ 
+          message: 'فشل في رفع الصورة: ' + uploadError.message 
+        });
+      }
+    } else {
+      imageUrl = imageBase64; // إذا كانت رابطاً موجوداً
     }
 
     const productData = {
@@ -127,7 +137,7 @@ router.post('/products', verifyToken, async (req, res) => {
       price: parseFloat(price),
       stock: parseInt(stock),
       bestseller: bestseller === 'true' || bestseller === true,
-      image: imageUrl // الآن تخزن رابط Cloudinary بدلاً من Base64
+      image: imageUrl
     };
 
     const product = new Product(productData);
@@ -139,8 +149,10 @@ router.post('/products', verifyToken, async (req, res) => {
     console.error('❌ خطأ في إضافة المنتج:', error);
     
     let errorMessage = error.message;
-    if (error.message.includes('Cloudinary')) {
+    if (error.message.includes('Cloudinary') || error.message.includes('رفع الصورة')) {
       errorMessage = 'فشل في رفع الصورة. يرجى المحاولة مرة أخرى';
+    } else if (error.name === 'PayloadTooLargeError') {
+      errorMessage = 'حجم الصورة كبير جداً. يرجى اختيار صورة أصغر';
     }
     
     res.status(400).json({ message: errorMessage });
@@ -169,10 +181,16 @@ router.put('/products/:id', verifyToken, async (req, res) => {
 
     // إذا كانت هناك صورة جديدة Base64، ارفعها لـ Cloudinary
     if (imageBase64 && imageBase64.startsWith('data:image/')) {
-      console.log('☁️ جاري تحديث الصورة في Cloudinary...');
-      const imageUrl = await uploadToCloudinary(imageBase64);
-      updateData.image = imageUrl;
-      console.log('✅ تم تحديث الصورة بنجاح');
+      try {
+        const imageUrl = await uploadToCloudinary(imageBase64);
+        updateData.image = imageUrl;
+        console.log('✅ تم تحديث الصورة بنجاح');
+      } catch (uploadError) {
+        console.error('❌ فشل في تحديث الصورة:', uploadError);
+        return res.status(400).json({ 
+          message: 'فشل في تحديث الصورة: ' + uploadError.message 
+        });
+      }
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(
