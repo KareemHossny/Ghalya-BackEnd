@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const connectDB = require('./config/database');
-//////////////
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const helmet = require('helmet');
@@ -16,8 +15,8 @@ const corsOptions = {
   origin: [
     'http://localhost:3000', 
     'http://localhost:3001', 
-    'http://localhost:3002',
-    'https://your-app-name.vercel.app'
+    'https://ghalya.vercel.app',
+    'https://ghalya-admin.vercel.app'
   ],
   credentials: true,
   optionsSuccessStatus: 200
