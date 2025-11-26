@@ -38,7 +38,7 @@ const uploadToCloudinary = async (imageBase64) => {
     
     const result = await cloudinary.uploader.upload(imageBase64, {
       folder: 'ghalya/products',
-      quality: 'auto:good', // جودة متوسطة لتقليل الحجم
+      quality: 'auto:good',
       fetch_format: 'auto',
       width: 800,
       height: 800,
@@ -103,10 +103,10 @@ router.post('/products', verifyToken, async (req, res) => {
     console.log('📦 طلب إضافة منتج جديد');
     console.log('📊 حجم البيانات المستلمة:', JSON.stringify(req.body).length, 'bytes');
 
-    const { name, description, price, stock, bestseller, imageBase64 } = req.body;
+    const { name, description, price, sizes, bestseller, imageBase64 } = req.body;
     
     // التحقق من البيانات المطلوبة
-    if (!name || !price || !stock) {
+    if (!name || !price || !sizes) {
       return res.status(400).json({ message: 'جميع الحقول المطلوبة يجب ملؤها' });
     }
 
@@ -135,7 +135,7 @@ router.post('/products', verifyToken, async (req, res) => {
       name,
       description: description || '',
       price: parseFloat(price),
-      stock: parseInt(stock),
+      sizes: Array.isArray(sizes) ? sizes : JSON.parse(sizes),
       bestseller: bestseller === 'true' || bestseller === true,
       image: imageUrl
     };
@@ -169,13 +169,13 @@ router.put('/products/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'المنتج غير موجود' });
     }
 
-    const { name, description, price, stock, bestseller, imageBase64 } = req.body;
+    const { name, description, price, sizes, bestseller, imageBase64 } = req.body;
 
     let updateData = {
       name,
       description: description || '',
       price: parseFloat(price),
-      stock: parseInt(stock),
+      sizes: Array.isArray(sizes) ? sizes : JSON.parse(sizes),
       bestseller: bestseller === 'true' || bestseller === true
     };
 
