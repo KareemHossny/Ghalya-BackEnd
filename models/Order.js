@@ -1,4 +1,3 @@
-// models/Order.js
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
@@ -27,6 +26,11 @@ const orderSchema = new mongoose.Schema({
     quantity: {
       type: Number,
       required: true
+    },
+    selectedSize: { // إضافة حقل المقاس المختار
+      type: String,
+      required: true,
+      enum: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
     }
   }],
   subtotal: {
@@ -49,6 +53,10 @@ const orderSchema = new mongoose.Schema({
   orderDate: {
     type: Date,
     default: Date.now
+  },
+  notes: {
+    type: String,
+    default: ''
   }
 });
 

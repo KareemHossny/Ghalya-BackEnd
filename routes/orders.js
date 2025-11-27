@@ -60,14 +60,27 @@ router.post('/', async (req, res) => {
     let subtotal = 0;
     const orderItems = [];
     
+    // التحقق من المخزون وتحديثه لكل منتج
     for (let item of items) {
       const product = await Product.findById(item.product);
       if (!product) {
         return res.status(404).json({ message: `المنتج غير موجود` });
       }
-      if (product.stock < item.quantity) {
+
+      // التحقق من وجود المقاس المطلوب
+      if (!item.selectedSize) {
+        return res.status(400).json({ message: `المقاس مطلوب للمنتج ${product.name}` });
+      }
+
+      // البحث عن المقاس في المنتج والتحقق من الكمية
+      const productSize = product.sizes.find(size => size.size === item.selectedSize);
+      if (!productSize) {
+        return res.status(400).json({ message: `المقاس ${item.selectedSize} غير متوفر للمنتج ${product.name}` });
+      }
+
+      if (productSize.quantity < item.quantity) {
         return res.status(400).json({ 
-          message: `لا يوجد مخزون كافي لـ ${product.name}. المتاح: ${product.stock}` 
+          message: `لا يوجد مخزون كافي لـ ${product.name} - المقاس ${item.selectedSize}. المتاح: ${productSize.quantity}` 
         });
       }
       
@@ -75,8 +88,20 @@ router.post('/', async (req, res) => {
       orderItems.push({
         product: product._id,
         quantity: item.quantity,
+        selectedSize: item.selectedSize, // حفظ المقاس المختار
         price: product.price
       });
+
+      // تحديث المخزون مباشرة بعد التحقق
+      productSize.quantity -= item.quantity;
+    }
+
+    // حفظ جميع التحديثات في قاعدة البيانات
+    for (let item of items) {
+      const product = await Product.findById(item.product);
+      const productSize = product.sizes.find(size => size.size === item.selectedSize);
+      productSize.quantity -= item.quantity;
+      await product.save();
     }
     
     // حساب تكلفة الشحن
@@ -99,14 +124,6 @@ router.post('/', async (req, res) => {
     
     const savedOrder = await order.save();
     
-    // تحديث المخزون
-    for (let item of items) {
-      await Product.findByIdAndUpdate(
-        item.product, 
-        { $inc: { stock: -item.quantity } }
-      );
-    }
-    
     // جلب البيانات الكاملة للطلب مع معلومات المنتجات
     const populatedOrder = await Order.findById(savedOrder._id)
       .populate('items.product');
@@ -115,6 +132,19 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ message: 'حدث خطأ أثناء إنشاء الطلب' });
+  }
+});
+
+// الحصول على جميع الطلبات (للوحة الإدارة)
+router.get('/', async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate('items.product')
+      .sort({ orderDate: -1 });
+    
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: 'حدث خطأ في الخادم' });
   }
 });
 
@@ -131,6 +161,31 @@ router.get('/:id', async (req, res) => {
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: 'حدث خطأ في الخادم' });
+  }
+});
+
+// تحديث حالة الطلب
+router.patch('/:id', async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['pending', 'shipped', 'delivered'].includes(status)) {
+      return res.status(400).json({ message: 'حالة غير صالحة' });
+    }
+    
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    ).populate('items.product');
+    
+    if (!order) {
+      return res.status(404).json({ message: 'الطلب غير موجود' });
+    }
+    
+    res.json(order);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 });
 
